@@ -188,8 +188,12 @@
                 <h1 class="comic-font text-2xl sm:text-3xl text-amber-600 drop-shadow-sm tracking-wide">
                     🔨 БАН КРОТА!
                 </h1>
-                <button id="sound-toggle" title="Включить/выключить звук" class="p-2 rounded-2xl bg-amber-100 hover:bg-amber-200 active:scale-95 text-amber-900 border-2 border-amber-300 transition">
+                <button id="sound-toggle" title="Включить/выключить звук" class="p-2 rounded-2xl bg-amber-100 hover:bg-amber-200 active:scale-95 text-amber-900 border-2 border-amber-300 transition cursor-pointer">
                     <span id="sound-icon" class="text-xl">🔊</span>
+                </button>
+                <button id="ton-connect-btn" class="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-95 text-white font-extrabold text-xs sm:text-sm border-2 border-sky-700 shadow-md transition cursor-pointer">
+                    <span id="ton-btn-icon">💎</span>
+                    <span id="ton-btn-text">Connect TON</span>
                 </button>
             </div>
 
@@ -293,6 +297,92 @@
     <footer class="text-center text-xs sm:text-sm font-bold text-emerald-950/80 pb-1">
         Кликай или тапай по вылезающим кротам, чтобы выписать им <span class="text-rose-700 font-black">БАН!</span>
     </footer>
+
+    <!-- Модальное окно шуточного подключения TON-кошелька -->
+    <div id="ton-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div class="bg-white border-4 border-sky-500 rounded-3xl p-5 sm:p-6 max-w-sm w-full shadow-2xl relative">
+            <button id="close-ton-modal" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-black flex items-center justify-center transition cursor-pointer">
+                ✕
+            </button>
+
+            <!-- Шаг 1: Выбор кошелька -->
+            <div id="ton-step-select">
+                <div class="text-center mb-4">
+                    <div class="text-4xl mb-1">💎</div>
+                    <h3 class="comic-font text-2xl text-sky-600">CONNECT TON</h3>
+                    <p class="text-xs font-bold text-slate-500 mt-1">Выберите кошелек для интеграции с кротами</p>
+                </div>
+
+                <div class="space-y-2.5">
+                    <button data-wallet="Tonkeeper" class="wallet-option w-full flex items-center justify-between p-3 rounded-2xl bg-sky-50 hover:bg-sky-100 border-2 border-sky-200 hover:border-sky-400 transition cursor-pointer">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">💎</span>
+                            <div class="text-left">
+                                <div class="font-black text-slate-800 text-sm">Tonkeeper</div>
+                                <div class="text-[11px] font-bold text-slate-500">Популярный кошелек</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-extrabold text-sky-600 bg-white px-2.5 py-1 rounded-xl border border-sky-200">Выбрать</span>
+                    </button>
+
+                    <button data-wallet="MyTonWallet" class="wallet-option w-full flex items-center justify-between p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border-2 border-indigo-200 hover:border-indigo-400 transition cursor-pointer">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🦊</span>
+                            <div class="text-left">
+                                <div class="font-black text-slate-800 text-sm">MyTonWallet</div>
+                                <div class="text-[11px] font-bold text-slate-500">Web & Desktop</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-extrabold text-indigo-600 bg-white px-2.5 py-1 rounded-xl border border-indigo-200">Выбрать</span>
+                    </button>
+
+                    <button data-wallet="Telegram Wallet" class="wallet-option w-full flex items-center justify-between p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-400 transition cursor-pointer">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">✈️</span>
+                            <div class="text-left">
+                                <div class="font-black text-slate-800 text-sm">Telegram Wallet</div>
+                                <div class="text-[11px] font-bold text-slate-500">Встроенный кошелек</div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-extrabold text-blue-600 bg-white px-2.5 py-1 rounded-xl border border-blue-200">Выбрать</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Шаг 2: Анимация подключения -->
+            <div id="ton-step-loading" class="hidden py-8 text-center">
+                <div class="inline-block w-12 h-12 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin mb-3"></div>
+                <div class="font-black text-lg text-slate-800">Подключение...</div>
+                <div id="ton-loading-wallet" class="text-xs font-bold text-slate-500 mt-1">Ожидание подтверждения в Tonkeeper</div>
+            </div>
+
+            <!-- Шаг 3: Шуточное уведомление о дрейне -->
+            <div id="ton-step-drained" class="hidden text-center">
+                <div class="bg-rose-100 border-2 border-rose-400 rounded-2xl p-4 mb-4">
+                    <div class="text-4xl mb-1 animate-bounce">🚨🐹💸</div>
+                    <h4 class="font-black text-base sm:text-lg text-rose-700 leading-snug">
+                        🚨 Крот сдрейнил все ваши средства!
+                    </h4>
+                    <div class="mt-2 py-1.5 px-3 bg-white rounded-xl border border-rose-200 inline-block">
+                        <span class="text-xs font-extrabold text-slate-600">Баланс: </span>
+                        <span class="text-sm font-black text-rose-600">0.00 TON</span>
+                    </div>
+                    <p class="text-xs font-bold text-rose-800/80 mt-2">
+                        (шутка, это же игра 😉)
+                    </p>
+                </div>
+
+                <div class="flex gap-2">
+                    <button id="disconnect-ton-btn" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold text-xs sm:text-sm transition cursor-pointer">
+                        Отключить кошелек
+                    </button>
+                    <button id="accept-drain-btn" class="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-white font-extrabold text-xs sm:text-sm border-b-2 border-amber-700 transition cursor-pointer">
+                        Понять и простить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         /**
@@ -747,7 +837,7 @@
                 state.score = Math.max(0, state.score - 2);
                 scoreDisplay.textContent = state.score;
 
-                spawnBanPopup(clientX, clientY, 'БУМ! -2', '#ef4444');
+                spawnBanPopup(clientX, clientY, 'БАБАХ! -2', '#ef4444');
                 spawnParticles(clientX, clientY, ['#ef4444', '#f97316', '#1e293b']);
                 hideMole(index);
             } else {
@@ -763,8 +853,8 @@
                 // Меняем спрайт на оглушенного крота со звездочками
                 hole.element.innerHTML = getCharacterSVG(hole.type, true);
 
-                // Яркая комикс-надпись "БАН!"
-                const label = isGolden ? `БАН! +${points}` : 'БАН!';
+                // Яркая комикс-надпись "БАН +1!" или "БАН +3!"
+                const label = isGolden ? 'БАН +3!' : 'БАН +1!';
                 const color = isGolden ? '#facc15' : '#fb7185';
                 spawnBanPopup(clientX, clientY, label, color);
                 spawnParticles(clientX, clientY, isGolden ? ['#facc15', '#fef08a', '#f59e0b'] : ['#fbbf24', '#38bdf8', '#fb7185']);
@@ -1001,6 +1091,85 @@
         });
 
         startBtn.addEventListener('click', startGame);
+
+        /**
+         * ШУТОЧНОЕ ПОДКЛЮЧЕНИЕ TON-КОШЕЛЬКА
+         */
+        const tonConnectBtn = document.getElementById('ton-connect-btn');
+        const tonBtnIcon = document.getElementById('ton-btn-icon');
+        const tonBtnText = document.getElementById('ton-btn-text');
+        const tonModal = document.getElementById('ton-modal');
+        const closeTonModal = document.getElementById('close-ton-modal');
+        const tonStepSelect = document.getElementById('ton-step-select');
+        const tonStepLoading = document.getElementById('ton-step-loading');
+        const tonStepDrained = document.getElementById('ton-step-drained');
+        const tonLoadingWallet = document.getElementById('ton-loading-wallet');
+        const walletOptions = document.querySelectorAll('.wallet-option');
+        const disconnectTonBtn = document.getElementById('disconnect-ton-btn');
+        const acceptDrainBtn = document.getElementById('accept-drain-btn');
+
+        let isTonConnected = false;
+
+        function openTonModal() {
+            tonModal.classList.remove('hidden');
+            tonModal.classList.add('flex');
+
+            if (isTonConnected) {
+                tonStepSelect.classList.add('hidden');
+                tonStepLoading.classList.add('hidden');
+                tonStepDrained.classList.remove('hidden');
+            } else {
+                tonStepSelect.classList.remove('hidden');
+                tonStepLoading.classList.add('hidden');
+                tonStepDrained.classList.add('hidden');
+            }
+        }
+
+        function closeTonModalFn() {
+            tonModal.classList.add('hidden');
+            tonModal.classList.remove('flex');
+        }
+
+        tonConnectBtn.addEventListener('click', openTonModal);
+        closeTonModal.addEventListener('click', closeTonModalFn);
+        acceptDrainBtn.addEventListener('click', closeTonModalFn);
+
+        tonModal.addEventListener('click', (e) => {
+            if (e.target === tonModal) closeTonModalFn();
+        });
+
+        walletOptions.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const walletName = btn.dataset.wallet;
+                sound.playPop();
+
+                tonStepSelect.classList.add('hidden');
+                tonStepLoading.classList.remove('hidden');
+                tonLoadingWallet.textContent = `Ожидание подтверждения в ${walletName}...`;
+
+                setTimeout(() => {
+                    isTonConnected = true;
+                    sound.playBomb();
+
+                    // Обновляем кнопку в шапке
+                    tonBtnIcon.textContent = '🚨';
+                    tonBtnText.textContent = 'UQDr...Krot (0 TON)';
+                    tonConnectBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 active:scale-95 text-white font-extrabold text-xs sm:text-sm border-2 border-rose-800 shadow-md transition cursor-pointer';
+
+                    // Показываем шуточное окно о дрейне
+                    tonStepLoading.classList.add('hidden');
+                    tonStepDrained.classList.remove('hidden');
+                }, 900);
+            });
+        });
+
+        disconnectTonBtn.addEventListener('click', () => {
+            isTonConnected = false;
+            tonBtnIcon.textContent = '💎';
+            tonBtnText.textContent = 'Connect TON';
+            tonConnectBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-95 text-white font-extrabold text-xs sm:text-sm border-2 border-sky-700 shadow-md transition cursor-pointer';
+            closeTonModalFn();
+        });
 
         // Инициализация поля при загрузке страницы
         window.addEventListener('DOMContentLoaded', () => {
