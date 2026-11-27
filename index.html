@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Бан крота! — Аркадная игра</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik+Bubbles&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Базовые настройки и шрифты */
+        body {
+            font-family: 'Nunito', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        .comic-font {
+            font-family: 'Rubik Bubbles', cursive, sans-serif;
+            letter-spacing: 1px;
+        }
+
+        /* Кастомный курсор-молоток на десктопе */
+        @media (hover: hover) and (pointer: fine) {
+            .game-active-area {
+                cursor: none !important;
+            }
+            .game-active-area * {
+                cursor: none !important;
+            }
+        }
+
+        /* Анимация встряски экрана (Screen Shake) */
+        @keyframes screenShake {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(-6px, 4px) rotate(-1deg); }
+            40% { transform: translate(6px, -4px) rotate(1deg); }
+            60% { transform: translate(-4px, -2px) rotate(-0.5deg); }
+            80% { transform: translate(4px, 2px) rotate(0.5deg); }
+        }
+
+        .shake-effect {
+            animation: screenShake 0.25s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Всплывающая комикс-надпись "БАН!" */
+        @keyframes popBan {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -20%) scale(0.3) rotate(-15deg);
+            }
+            30% {
+                opacity: 1;
+                transform: translate(-50%, -70%) scale(1.25) rotate(8deg);
+            }
+            50% {
+                transform: translate(-50%, -85%) scale(1.0) rotate(-4deg);
+            }
+            80% {
+                opacity: 1;
+                transform: translate(-50%, -110%) scale(1.05) rotate(2deg);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -140%) scale(0.8) rotate(0deg);
+            }
+        }
+
+        .ban-popup {
+            position: fixed;
+            pointer-events: none;
+            z-index: 60;
+            animation: popBan 0.75s ease-out forwards;
+            text-shadow: 
+                -3px -3px 0 #1e1b4b,  
+                 3px -3px 0 #1e1b4b,
+                -3px  3px 0 #1e1b4b,
+                 3px  3px 0 #1e1b4b,
+                 0px  5px 0 #1e1b4b;
+        }
+
+        /* Анимация вращения звездочек над головой оглушенного крота */
+        @keyframes spinStars {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.15); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        .stun-stars {
+            animation: spinStars 0.6s linear infinite;
+            transform-origin: center;
+        }
+
+        /* Стилизация норы и маскировки крота */
+        .hole-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 0.92;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        /* Маска, скрывающая нижнюю часть крота под землей */
+        .mole-mask {
+            position: absolute;
+            bottom: 14%;
+            width: 78%;
+            height: 86%;
+            overflow: hidden;
+            border-bottom-left-radius: 50% 24%;
+            border-bottom-right-radius: 50% 24%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        /* Сам персонаж (крот / золотой крот / бомба) */
+        .mole-entity {
+            position: absolute;
+            bottom: -105%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 88%;
+            height: 92%;
+            transition: bottom 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: auto;
+            will-change: bottom;
+        }
+
+        .mole-entity.up {
+            bottom: -4%;
+        }
+
+        .mole-entity.bonked {
+            transition: bottom 0.14s ease-in;
+            bottom: -105% !important;
+        }
+
+        /* Пульсация кнопки старта */
+        @keyframes pulseBtn {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
+        .btn-pulse {
+            animation: pulseBtn 2s infinite;
+        }
+
+        /* Текстура лужайки */
+        .lawn-bg {
+            background-color: #65c938;
+            background-image: 
+                radial-gradient(circle at 20% 25%, #7be04b 0%, transparent 18%),
+                radial-gradient(circle at 80% 70%, #56b52c 0%, transparent 22%),
+                radial-gradient(circle at 50% 50%, #73d645 0%, transparent 35%);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-400 min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 overflow-hidden">
+
+    <!-- Кастомный молоток (следует за курсором или появляется при тапе) -->
+    <div id="custom-hammer" class="fixed pointer-events-none z-50 hidden transition-transform duration-75" style="width: 96px; height: 96px; transform-origin: 75% 75%;">
+        <svg viewBox="0 0 120 120" class="w-full h-full drop-shadow-xl">
+            <!-- Рукоятка -->
+            <rect x="65" y="45" width="14" height="65" rx="6" transform="rotate(-35 72 75)" fill="#d97706" stroke="#451a03" stroke-width="4"/>
+            <rect x="68" y="48" width="4" height="58" rx="2" transform="rotate(-35 72 75)" fill="#fbbf24" opacity="0.6"/>
+            <!-- Боёк молотка -->
+            <g transform="rotate(-35 52 42)">
+                <rect x="22" y="22" width="60" height="36" rx="10" fill="#92400e" stroke="#451a03" stroke-width="4"/>
+                <!-- Ударные накладки -->
+                <rect x="16" y="20" width="12" height="40" rx="5" fill="#fbbf24" stroke="#451a03" stroke-width="4"/>
+                <rect x="76" y="20" width="12" height="40" rx="5" fill="#fbbf24" stroke="#451a03" stroke-width="4"/>
+                <!-- Блик на бойке -->
+                <rect x="32" y="27" width="38" height="6" rx="3" fill="#b45309"/>
+            </g>
+        </svg>
+    </div>
+
+    <!-- Контейнер для всплывающих эффектов и частиц -->
+    <div id="effects-layer" class="fixed inset-0 pointer-events-none z-40 overflow-hidden"></div>
+
+    <!-- Верхняя панель интерфейса (HUD) -->
+    <header class="w-full max-w-3xl bg-white/95 backdrop-blur-md rounded-3xl shadow-xl border-4 border-amber-800/20 p-3 sm:p-4 z-30">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <!-- Логотип и кнопка звука -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <h1 class="comic-font text-2xl sm:text-3xl text-amber-600 drop-shadow-sm tracking-wide">
+                    🔨 БАН КРОТА!
+                </h1>
+                <button id="sound-toggle" title="Включить/выключить звук" class="p-2 rounded-2xl bg-amber-100 hover:bg-amber-200 active:scale-95 text-amber-900 border-2 border-amber-300 transition">
+                    <span id="sound-icon" class="text-xl">🔊</span>
+                </button>
+            </div>
+
+            <!-- Счетчики: Очки, Таймер, Рекорд -->
+            <div class="flex items-center gap-2 sm:gap-4 text-center">
+                <div class="bg-emerald-100 border-2 border-emerald-400 rounded-2xl px-3 py-1 sm:px-4">
+                    <div class="text-[10px] sm:text-xs font-black uppercase text-emerald-800">Очки</div>
+                    <div id="score-display" class="text-xl sm:text-2xl font-black text-emerald-700 leading-tight">0</div>
+                </div>
+
+                <div class="bg-rose-100 border-2 border-rose-400 rounded-2xl px-3 py-1 sm:px-4">
+                    <div class="text-[10px] sm:text-xs font-black uppercase text-rose-800">Время</div>
+                    <div id="timer-display" class="text-xl sm:text-2xl font-black text-rose-600 leading-tight">30</div>
+                </div>
+
+                <div class="bg-amber-100 border-2 border-amber-400 rounded-2xl px-3 py-1 sm:px-4">
+                    <div class="text-[10px] sm:text-xs font-black uppercase text-amber-800">Рекорд</div>
+                    <div id="highscore-display" class="text-xl sm:text-2xl font-black text-amber-700 leading-tight">0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Панель выбора сложности -->
+        <div class="mt-2 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <span class="text-xs sm:text-sm font-bold text-slate-600">Сложность:</span>
+                <button data-diff="easy" class="diff-btn px-2.5 py-1 rounded-xl text-xs sm:text-sm font-extrabold border-2 transition bg-emerald-500 text-white border-emerald-700 shadow-sm">
+                    Легко
+                </button>
+                <button data-diff="normal" class="diff-btn px-2.5 py-1 rounded-xl text-xs sm:text-sm font-extrabold border-2 transition bg-slate-100 text-slate-700 border-slate-300 hover:bg-amber-100">
+                    Нормально
+                </button>
+                <button data-diff="hard" class="diff-btn px-2.5 py-1 rounded-xl text-xs sm:text-sm font-extrabold border-2 transition bg-slate-100 text-slate-700 border-slate-300 hover:bg-rose-100">
+                    Хардкор
+                </button>
+            </div>
+
+            <!-- Легенда персонажей -->
+            <div class="hidden md:flex items-center gap-3 text-xs font-bold text-slate-600">
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-amber-800"></span> Крот: +1</span>
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-yellow-400"></span> В каске: +3</span>
+                <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-slate-800"></span> Бомба: -2</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Основное игровое поле (Лужайка 3x3) -->
+    <main id="game-wrapper" class="relative w-full max-w-2xl flex-1 flex items-center justify-center my-2 sm:my-3">
+        <div id="game-board" class="game-active-area relative w-full aspect-square max-h-[68vh] lawn-bg rounded-[2.5rem] border-8 border-emerald-700 shadow-2xl p-3 sm:p-6 grid grid-cols-3 grid-rows-3 gap-2 sm:gap-5 overflow-hidden">
+            
+            <!-- Декоративные травинки и цветочки на лужайке -->
+            <svg class="absolute inset-0 w-full h-full pointer-events-none opacity-40" viewBox="0 0 400 400">
+                <path d="M40 50 Q45 35 50 50 M45 50 Q52 38 56 50" stroke="#15803d" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <path d="M340 70 Q345 55 350 70 M345 70 Q352 58 356 70" stroke="#15803d" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <path d="M60 350 Q65 335 70 350 M65 350 Q72 338 76 350" stroke="#15803d" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <path d="M330 330 Q335 315 340 330 M335 330 Q342 318 346 330" stroke="#15803d" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <circle cx="195" cy="30" r="4" fill="#fef08a"/>
+                <circle cx="25" cy="200" r="4" fill="#ffffff"/>
+                <circle cx="375" cy="210" r="4" fill="#fbcfe8"/>
+            </svg>
+
+            <!-- 9 лунок (генерируются через JS для чистоты и единого шаблона SVG) -->
+        </div>
+
+        <!-- Стартовый / Финальный оверлей -->
+        <div id="overlay-screen" class="absolute inset-0 z-20 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm rounded-[2.5rem]">
+            <div class="bg-white border-4 border-amber-500 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center shadow-2xl transform transition-all">
+                <div id="overlay-emoji" class="text-6xl mb-2">🐹🔨</div>
+                <h2 id="overlay-title" class="comic-font text-3xl sm:text-4xl text-amber-600 mb-2">
+                    ГОТОВ К БАНУ?
+                </h2>
+                <p id="overlay-subtitle" class="text-slate-600 font-bold text-sm sm:text-base mb-5">
+                    Бей кротов молотком по голове! Лови золотых кротов в каске (+3 очка) и не трогай бомбы (-2 очка)!
+                </p>
+
+                <!-- Блок итогов раунда (скрыт до конца игры) -->
+                <div id="round-stats" class="hidden bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-5">
+                    <div class="grid grid-cols-2 gap-2 text-center">
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">Твой счет</div>
+                            <div id="final-score" class="text-3xl font-black text-emerald-600">0</div>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-slate-500 uppercase">Забанено кротов</div>
+                            <div id="final-hits" class="text-3xl font-black text-amber-600">0</div>
+                        </div>
+                    </div>
+                    <div id="new-record-badge" class="hidden mt-2 py-1 px-3 bg-yellow-400 text-amber-950 font-black text-xs rounded-full inline-block uppercase tracking-wider">
+                        🏆 Новый рекорд!
+                    </div>
+                </div>
+
+                <button id="start-btn" class="btn-pulse w-full py-4 px-6 bg-gradient-to-b from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 active:translate-y-1 text-white comic-font text-2xl sm:text-3xl rounded-2xl border-b-4 border-orange-700 shadow-lg transition cursor-pointer">
+                    НАЧАТЬ ИГРУ!
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Нижняя подсказка для мобильных устройств -->
+    <footer class="text-center text-xs sm:text-sm font-bold text-emerald-950/80 pb-1">
+        Кликай или тапай по вылезающим кротам, чтобы выписать им <span class="text-rose-700 font-black">БАН!</span>
+    </footer>
+
+    <script>
+        /**
+         * ЗВУКОВОЙ ДВИЖОК (Web Audio API)
+         * Генерирует звуки синтезатором без внешних аудиофайлов
+         */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            // Звук вылезания крота ("поп")
+            playPop() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(480, now + 0.09);
+
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            // Свист молотка при взмахе
+            playSwing() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.12);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.13);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.13);
+            }
+
+            // Комичный глухой "Бонк!" при попадании
+            playBonk(isGolden = false) {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+
+                // Низкий удар
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(isGolden ? 520 : 280, now);
+                osc.frequency.exponentialRampToValueAtTime(75, now + 0.18);
+
+                gain.gain.setValueAtTime(0.45, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.19);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.19);
+
+                // Звонкий призвук для золотого крота
+                if (isGolden) {
+                    const chime = this.ctx.createOscillator();
+                    const chimeGain = this.ctx.createGain();
+                    chime.type = 'triangle';
+                    chime.frequency.setValueAtTime(880, now + 0.04);
+                    chime.frequency.setValueAtTime(1320, now + 0.1);
+                    chimeGain.gain.setValueAtTime(0.25, now + 0.04);
+                    chimeGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                    chime.connect(chimeGain);
+                    chimeGain.connect(this.ctx.destination);
+                    chime.start(now + 0.04);
+                    chime.stop(now + 0.3);
+                }
+            }
+
+            // Звук взрыва бомбы (ошибка)
+            playBomb() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(130, now);
+                osc.frequency.linearRampToValueAtTime(42, now + 0.35);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.36);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.36);
+            }
+
+            // Фанфары окончания раунда
+            playGameOver() {
+                if (!this.enabled) return;
+                this.init();
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+
+                    gain.gain.setValueAtTime(0.22, now + idx * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.1 + 0.35);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now + idx * 0.1);
+                    osc.stop(now + idx * 0.1 + 0.35);
+                });
+            }
+        }
+
+        /**
+         * ОСНОВНАЯ ЛОГИКА ИГРЫ «БАН КРОТА»
+         */
+        const sound = new SoundEngine();
+
+        // Конфигурация уровней сложности
+        const DIFFICULTIES = {
+            easy: {
+                name: 'Легко',
+                minShowTime: 1050,
+                maxShowTime: 1550,
+                spawnInterval: 950,
+                maxConcurrent: 2,
+                bombChance: 0.12,
+                goldenChance: 0.18
+            },
+            normal: {
+                name: 'Нормально',
+                minShowTime: 750,
+                maxShowTime: 1150,
+                spawnInterval: 700,
+                maxConcurrent: 3,
+                bombChance: 0.18,
+                goldenChance: 0.20
+            },
+            hard: {
+                name: 'Хардкор',
+                minShowTime: 500,
+                maxShowTime: 820,
+                spawnInterval: 480,
+                maxConcurrent: 4,
+                bombChance: 0.25,
+                goldenChance: 0.22
+            }
+        };
+
+        // Состояние игры
+        const state = {
+            score: 0,
+            hits: 0,
+            timeLeft: 30,
+            isPlaying: false,
+            difficulty: 'easy',
+            highScore: parseInt(localStorage.getItem('banKrotaHighScore') || '0', 10),
+            holes: [],
+            spawnTimer: null,
+            countdownTimer: null
+        };
+
+        // DOM-элементы
+        const gameBoard = document.getElementById('game-board');
+        const scoreDisplay = document.getElementById('score-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const highscoreDisplay = document.getElementById('highscore-display');
+        const overlayScreen = document.getElementById('overlay-screen');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlaySubtitle = document.getElementById('overlay-subtitle');
+        const overlayEmoji = document.getElementById('overlay-emoji');
+        const roundStats = document.getElementById('round-stats');
+        const finalScoreEl = document.getElementById('final-score');
+        const finalHitsEl = document.getElementById('final-hits');
+        const newRecordBadge = document.getElementById('new-record-badge');
+        const startBtn = document.getElementById('start-btn');
+        const soundToggle = document.getElementById('sound-toggle');
+        const soundIcon = document.getElementById('sound-icon');
+        const customHammer = document.getElementById('custom-hammer');
+        const effectsLayer = document.getElementById('effects-layer');
+        const diffButtons = document.querySelectorAll('.diff-btn');
+
+        highscoreDisplay.textContent = state.highScore;
+
+        /**
+         * Генерация SVG-персонажей (Обычный крот, Золотой крот в каске, Бомба)
+         */
+        function getCharacterSVG(type, isStunned = false) {
+            if (type === 'bomb') {
+                return `
+                <svg viewBox="0 0 120 130" class="w-full h-full drop-shadow-md">
+                    <!-- Фитиль -->
+                    <path d="M60 28 Q68 12 82 16" stroke="#92400e" stroke-width="5" fill="none" stroke-linecap="round"/>
+                    <!-- Искра -->
+                    <circle cx="84" cy="16" r="7" fill="#ef4444" class="animate-ping"/>
+                    <circle cx="84" cy="16" r="5" fill="#facc15"/>
+                    <!-- Корпус бомбы -->
+                    <rect x="48" y="24" width="24" height="10" rx="3" fill="#475569" stroke="#0f172a" stroke-width="3"/>
+                    <circle cx="60" cy="72" r="42" fill="#1e293b" stroke="#0f172a" stroke-width="4"/>
+                    <!-- Блик -->
+                    <ellipse cx="44" cy="54" rx="10" ry="6" transform="rotate(-30 44 54)" fill="#64748b" opacity="0.7"/>
+                    <!-- Злая мордочка на бомбе -->
+                    <path d="M40 66 L52 72 M80 66 L68 72" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
+                    <circle cx="46" cy="76" r="4" fill="#ef4444"/>
+                    <circle cx="74" cy="76" r="4" fill="#ef4444"/>
+                    <path d="M46 92 Q60 82 74 92" stroke="#f87171" stroke-width="4" fill="none" stroke-linecap="round"/>
+                </svg>`;
+            }
+
+            const isGolden = type === 'golden';
+            const bodyColor = isGolden ? '#f59e0b' : '#78350f';
+            const bodyStroke = isGolden ? '#78350f' : '#451a03';
+            const bellyColor = isGolden ? '#fef08a' : '#d97706';
+
+            // Глаза: обычные или крестики при ударе
+            const eyesSVG = isStunned
+                ? `
+                    <g stroke="#1e1b4b" stroke-width="4" stroke-linecap="round">
+                        <path d="M38 56 L48 66 M48 56 L38 66"/>
+                        <path d="M72 56 L82 66 M82 56 L72 66"/>
+                    </g>
+                    <!-- Звездочки над головой -->
+                    <g class="stun-stars" style="transform-origin: 60px 18px;">
+                        <polygon points="35,10 38,16 44,16 39,20 41,26 35,22 29,26 31,20 26,16 32,16" fill="#facc15" stroke="#854d0e" stroke-width="1.5"/>
+                        <polygon points="85,10 88,16 94,16 89,20 91,26 85,22 79,26 81,20 76,16 82,16" fill="#facc15" stroke="#854d0e" stroke-width="1.5"/>
+                        <polygon points="60,2 62,7 68,7 63,11 65,16 60,13 55,16 57,11 52,7 58,7" fill="#fef08a" stroke="#854d0e" stroke-width="1.5"/>
+                    </g>
+                `
+                : `
+                    <circle cx="43" cy="60" r="6.5" fill="#1e1b4b"/>
+                    <circle cx="41" cy="58" r="2.2" fill="#ffffff"/>
+                    <circle cx="77" cy="60" r="6.5" fill="#1e1b4b"/>
+                    <circle cx="75" cy="58" r="2.2" fill="#ffffff"/>
+                `;
+
+            // Строительная каска для золотого крота
+            const helmetSVG = isGolden
+                ? `
+                    <path d="M26 42 C26 20, 94 20, 94 42 Z" fill="#facc15" stroke="#854d0e" stroke-width="3.5"/>
+                    <rect x="20" y="39" width="80" height="7" rx="3.5" fill="#eab308" stroke="#854d0e" stroke-width="3"/>
+                    <rect x="55" y="22" width="10" height="17" rx="3" fill="#fef08a"/>
+                `
+                : '';
+
+            return `
+            <svg viewBox="0 0 120 130" class="w-full h-full drop-shadow-md">
+                <!-- Лапки -->
+                <ellipse cx="26" cy="105" rx="12" ry="9" fill="${bellyColor}" stroke="${bodyStroke}" stroke-width="3.5"/>
+                <ellipse cx="94" cy="105" rx="12" ry="9" fill="${bellyColor}" stroke="${bodyStroke}" stroke-width="3.5"/>
+                <!-- Туловище / Голова -->
+                <path d="M24 125 L24 68 C24 32, 96 32, 96 68 L96 125 Z" fill="${bodyColor}" stroke="${bodyStroke}" stroke-width="4"/>
+                <!-- Светлое пузико -->
+                <ellipse cx="60" cy="108" rx="24" ry="18" fill="${bellyColor}" opacity="0.85"/>
+                <!-- Румянец -->
+                <ellipse cx="32" cy="72" rx="7" ry="4.5" fill="#fb7185" opacity="0.7"/>
+                <ellipse cx="88" cy="72" rx="7" ry="4.5" fill="#fb7185" opacity="0.7"/>
+                <!-- Глаза и звездочки -->
+                ${eyesSVG}
+                <!-- Мордочка и нос -->
+                <ellipse cx="60" cy="74" rx="16" ry="12" fill="#fde68a"/>
+                <ellipse cx="60" cy="69" rx="8" ry="5.5" fill="#f43f5e" stroke="#881337" stroke-width="2"/>
+                <ellipse cx="58" cy="67.5" rx="2.5" ry="1.5" fill="#ffffff"/>
+                <!-- Зубки -->
+                <rect x="54" y="81" width="5.5" height="7" rx="1.5" fill="#ffffff" stroke="#451a03" stroke-width="1.5"/>
+                <rect x="60.5" y="81" width="5.5" height="7" rx="1.5" fill="#ffffff" stroke="#451a03" stroke-width="1.5"/>
+                <!-- Усики -->
+                <path d="M36 73 L20 70 M36 78 L21 81 M84 73 L100 70 M84 78 L99 81" stroke="${bodyStroke}" stroke-width="2.5" stroke-linecap="round"/>
+                <!-- Каска (если золотой) -->
+                ${helmetSVG}
+            </svg>`;
+        }
+
+        /**
+         * Инициализация сетки 3x3 из 9 нор
+         */
+        function createHoles() {
+            gameBoard.querySelectorAll('.hole-container').forEach(el => el.remove());
+            state.holes = [];
+
+            for (let i = 0; i < 9; i++) {
+                const holeEl = document.createElement('div');
+                holeEl.className = 'hole-container';
+                holeEl.dataset.index = i;
+
+                holeEl.innerHTML = `
+                    <!-- Задний край норы (темная глубина) -->
+                    <div class="w-[82%] h-[28%] bg-amber-950 rounded-[50%] border-4 border-amber-900 shadow-inner relative z-0"></div>
+                    
+                    <!-- Контейнер-маска для вылезающего крота -->
+                    <div class="mole-mask">
+                        <div class="mole-entity" data-hole="${i}"></div>
+                    </div>
+
+                    <!-- Передний земляной вал (насыпь) -->
+                    <svg viewBox="0 0 160 46" class="w-[92%] h-auto -mt-[14%] relative z-20 pointer-events-none drop-shadow-md">
+                        <path d="M8 34 C8 16, 152 16, 152 34 C152 44, 8 44, 8 34 Z" fill="#78350f" stroke="#451a03" stroke-width="4"/>
+                        <path d="M22 30 C45 22, 115 22, 138 30" stroke="#92400e" stroke-width="4" stroke-linecap="round" fill="none"/>
+                        <!-- Камешки на насыпи -->
+                        <circle cx="34" cy="34" r="3.5" fill="#a8a29e"/>
+                        <circle cx="122" cy="33" r="4" fill="#a8a29e"/>
+                        <circle cx="80" cy="36" r="2.5" fill="#d6d3d1"/>
+                    </svg>
+                `;
+
+                const moleEl = holeEl.querySelector('.mole-entity');
+
+                // Обработка удара по кроту (pointerdown срабатывает мгновенно и на мыши, и на тачскрине)
+                moleEl.addEventListener('pointerdown', (e) => {
+                    e.stopPropagation();
+                    handleWhack(i, e.clientX, e.clientY);
+                });
+
+                gameBoard.appendChild(holeEl);
+
+                state.holes.push({
+                    index: i,
+                    element: moleEl,
+                    isUp: false,
+                    isBonked: false,
+                    type: 'normal',
+                    hideTimeout: null
+                });
+            }
+        }
+
+        /**
+         * Появление случайного крота из свободной норы
+         */
+        function spawnMole() {
+            if (!state.isPlaying) return;
+
+            const config = DIFFICULTIES[state.difficulty];
+            const activeCount = state.holes.filter(h => h.isUp).length;
+
+            if (activeCount >= config.maxConcurrent) return;
+
+            const availableHoles = state.holes.filter(h => !h.isUp);
+            if (availableHoles.length === 0) return;
+
+            const randomHole = availableHoles[Math.floor(Math.random() * availableHoles.length)];
+
+            // Определяем тип персонажа
+            const roll = Math.random();
+            let type = 'normal';
+            if (roll < config.bombChance) {
+                type = 'bomb';
+            } else if (roll < config.bombChance + config.goldenChance) {
+                type = 'golden';
+            }
+
+            randomHole.type = type;
+            randomHole.isUp = true;
+            randomHole.isBonked = false;
+            randomHole.element.innerHTML = getCharacterSVG(type, false);
+            randomHole.element.classList.remove('bonked');
+            
+            // Небольшая задержка для плавного запуска CSS-перехода
+            requestAnimationFrame(() => {
+                randomHole.element.classList.add('up');
+            });
+
+            sound.playPop();
+
+            // Время, через которое крот спрячется сам
+            const stayDuration = Math.floor(
+                Math.random() * (config.maxShowTime - config.minShowTime + 1) + config.minShowTime
+            );
+
+            clearTimeout(randomHole.hideTimeout);
+            randomHole.hideTimeout = setTimeout(() => {
+                hideMole(randomHole.index);
+            }, stayDuration);
+        }
+
+        /**
+         * Скрытие крота обратно в нору
+         */
+        function hideMole(index) {
+            const hole = state.holes[index];
+            if (!hole || !hole.isUp) return;
+
+            hole.element.classList.remove('up');
+            clearTimeout(hole.hideTimeout);
+
+            setTimeout(() => {
+                hole.isUp = false;
+                hole.isBonked = false;
+                hole.element.classList.remove('bonked');
+            }, 180);
+        }
+
+        /**
+         * Обработка попадания молотком по персонажу
+         */
+        function handleWhack(index, clientX, clientY) {
+            if (!state.isPlaying) return;
+
+            // Анимация взмаха молотка
+            triggerHammerSwing(clientX, clientY);
+
+            const hole = state.holes[index];
+            if (!hole.isUp || hole.isBonked) return;
+
+            hole.isBonked = true;
+            clearTimeout(hole.hideTimeout);
+
+            // Встряска игрового поля
+            gameBoard.classList.remove('shake-effect');
+            void gameBoard.offsetWidth; // Перезапуск CSS-анимации
+            gameBoard.classList.add('shake-effect');
+
+            if (hole.type === 'bomb') {
+                // Попадание по бомбе
+                sound.playBomb();
+                state.score = Math.max(0, state.score - 2);
+                scoreDisplay.textContent = state.score;
+
+                spawnBanPopup(clientX, clientY, 'БУМ! -2', '#ef4444');
+                spawnParticles(clientX, clientY, ['#ef4444', '#f97316', '#1e293b']);
+                hideMole(index);
+            } else {
+                // Точное попадание по кроту!
+                const isGolden = hole.type === 'golden';
+                const points = isGolden ? 3 : 1;
+
+                sound.playBonk(isGolden);
+                state.score += points;
+                state.hits += 1;
+                scoreDisplay.textContent = state.score;
+
+                // Меняем спрайт на оглушенного крота со звездочками
+                hole.element.innerHTML = getCharacterSVG(hole.type, true);
+
+                // Яркая комикс-надпись "БАН!"
+                const label = isGolden ? `БАН! +${points}` : 'БАН!';
+                const color = isGolden ? '#facc15' : '#fb7185';
+                spawnBanPopup(clientX, clientY, label, color);
+                spawnParticles(clientX, clientY, isGolden ? ['#facc15', '#fef08a', '#f59e0b'] : ['#fbbf24', '#38bdf8', '#fb7185']);
+
+                // Небольшая пауза, чтобы игрок увидел звездочки над головой, затем быстрый уход в нору
+                setTimeout(() => {
+                    hole.element.classList.add('bonked');
+                    hole.element.classList.remove('up');
+                    setTimeout(() => {
+                        hole.isUp = false;
+                        hole.isBonked = false;
+                        hole.element.classList.remove('bonked');
+                    }, 150);
+                }, 160);
+            }
+        }
+
+        /**
+         * Создание всплывающей комикс-надписи «БАН!»
+         */
+        function spawnBanPopup(x, y, text, fillColor) {
+            const popup = document.createElement('div');
+            popup.className = 'ban-popup comic-font text-3xl sm:text-5xl font-black select-none';
+            popup.style.left = `${x}px`;
+            popup.style.top = `${y - 20}px`;
+            popup.style.color = fillColor;
+            popup.textContent = text;
+
+            effectsLayer.appendChild(popup);
+            setTimeout(() => popup.remove(), 750);
+        }
+
+        /**
+         * Разлет комикс-частиц и звездочек при ударе
+         */
+        function spawnParticles(x, y, colors) {
+            const particleCount = 10;
+            for (let i = 0; i < particleCount; i++) {
+                const p = document.createElement('div');
+                const size = Math.random() * 10 + 6;
+                const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.4;
+                const velocity = Math.random() * 65 + 35;
+                const dx = Math.cos(angle) * velocity;
+                const dy = Math.sin(angle) * velocity;
+
+                p.style.position = 'fixed';
+                p.style.left = `${x}px`;
+                p.style.top = `${y}px`;
+                p.style.width = `${size}px`;
+                p.style.height = `${size}px`;
+                p.style.backgroundColor = colors[i % colors.length];
+                p.style.borderRadius = i % 2 === 0 ? '50%' : '3px';
+                p.style.border = '2px solid #1e1b4b';
+                p.style.pointerEvents = 'none';
+                p.style.zIndex = '55';
+                p.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.45s ease-out';
+
+                effectsLayer.appendChild(p);
+
+                requestAnimationFrame(() => {
+                    p.style.transform = `translate(${dx}px, ${dy}px) rotate(${Math.random() * 360}deg) scale(0.3)`;
+                    p.style.opacity = '0';
+                });
+
+                setTimeout(() => p.remove(), 460);
+            }
+        }
+
+        /**
+         * Управление кастомным молотком (десктоп + мобильные тапы)
+         */
+        let hammerSwingTimeout = null;
+        let isTouchDevice = false;
+
+        function positionHammer(x, y) {
+            customHammer.style.left = `${x - 28}px`;
+            customHammer.style.top = `${y - 52}px`;
+        }
+
+        function triggerHammerSwing(x, y) {
+            if (x !== undefined && y !== undefined) {
+                positionHammer(x, y);
+            }
+            customHammer.classList.remove('hidden');
+            customHammer.style.transform = 'rotate(-58deg) scale(1.1)';
+
+            clearTimeout(hammerSwingTimeout);
+            hammerSwingTimeout = setTimeout(() => {
+                customHammer.style.transform = 'rotate(0deg) scale(1)';
+                if (isTouchDevice) {
+                    setTimeout(() => customHammer.classList.add('hidden'), 120);
+                }
+            }, 110);
+        }
+
+        // Движение мыши по игровому полю
+        gameBoard.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'mouse') {
+                isTouchDevice = false;
+                customHammer.classList.remove('hidden');
+                positionHammer(e.clientX, e.clientY);
+            }
+        });
+
+        gameBoard.addEventListener('pointerleave', () => {
+            if (!isTouchDevice) {
+                customHammer.classList.add('hidden');
+            }
+        });
+
+        // Клик/тап по пустому месту на лужайке (промах молотком)
+        gameBoard.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'mouse') {
+                isTouchDevice = true;
+            }
+            if (state.isPlaying) {
+                sound.playSwing();
+                triggerHammerSwing(e.clientX, e.clientY);
+            }
+        });
+
+        /**
+         * Запуск и завершение раунда
+         */
+        function startGame() {
+            sound.init();
+            state.score = 0;
+            state.hits = 0;
+            state.timeLeft = 30;
+            state.isPlaying = true;
+
+            scoreDisplay.textContent = '0';
+            timerDisplay.textContent = '30';
+            timerDisplay.parentElement.classList.remove('animate-pulse');
+
+            overlayScreen.classList.add('hidden');
+            roundStats.classList.add('hidden');
+            newRecordBadge.classList.add('hidden');
+
+            // Сброс всех нор
+            state.holes.forEach(h => hideMole(h.index));
+
+            const config = DIFFICULTIES[state.difficulty];
+
+            // Запуск цикла появления кротов
+            clearInterval(state.spawnTimer);
+            spawnMole();
+            state.spawnTimer = setInterval(spawnMole, config.spawnInterval);
+
+            // Запуск таймера обратного отсчета
+            clearInterval(state.countdownTimer);
+            state.countdownTimer = setInterval(() => {
+                state.timeLeft -= 1;
+                timerDisplay.textContent = state.timeLeft;
+
+                if (state.timeLeft <= 5 && state.timeLeft > 0) {
+                    timerDisplay.parentElement.classList.add('animate-pulse');
+                }
+
+                if (state.timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function endGame() {
+            state.isPlaying = false;
+            clearInterval(state.spawnTimer);
+            clearInterval(state.countdownTimer);
+            timerDisplay.parentElement.classList.remove('animate-pulse');
+
+            // Прячем всех оставшихся кротов
+            state.holes.forEach(h => hideMole(h.index));
+            customHammer.classList.add('hidden');
+
+            sound.playGameOver();
+
+            // Проверка рекорда
+            let isNewRecord = false;
+            if (state.score > state.highScore) {
+                state.highScore = state.score;
+                localStorage.setItem('banKrotaHighScore', state.highScore.toString());
+                highscoreDisplay.textContent = state.highScore;
+                isNewRecord = true;
+            }
+
+            // Показываем финальное окно
+            overlayEmoji.textContent = isNewRecord ? '🏆🔨' : '⏰🔨';
+            overlayTitle.textContent = 'ВРЕМЯ ВЫШЛО!';
+            overlaySubtitle.textContent = 'Отличная работа! Все нарушители получили по заслугам.';
+            finalScoreEl.textContent = state.score;
+            finalHitsEl.textContent = state.hits;
+
+            roundStats.classList.remove('hidden');
+            if (isNewRecord) {
+                newRecordBadge.classList.remove('hidden');
+            }
+
+            startBtn.textContent = 'ИГРАТЬ СНОВА!';
+            overlayScreen.classList.remove('hidden');
+        }
+
+        /**
+         * Переключение сложности и звука
+         */
+        diffButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const selected = btn.dataset.diff;
+                state.difficulty = selected;
+
+                diffButtons.forEach(b => {
+                    b.className = 'diff-btn px-2.5 py-1 rounded-xl text-xs sm:text-sm font-extrabold border-2 transition bg-slate-100 text-slate-700 border-slate-300 hover:bg-amber-100 cursor-pointer';
+                });
+
+                const activeColors = {
+                    easy: 'bg-emerald-500 text-white border-emerald-700',
+                    normal: 'bg-amber-500 text-white border-amber-700',
+                    hard: 'bg-rose-500 text-white border-rose-700'
+                };
+
+                btn.className = `diff-btn px-2.5 py-1 rounded-xl text-xs sm:text-sm font-extrabold border-2 transition shadow-sm cursor-pointer ${activeColors[selected]}`;
+
+                // Если игра уже идет — перезапускаем с новой сложностью
+                if (state.isPlaying) {
+                    startGame();
+                }
+            });
+        });
+
+        soundToggle.addEventListener('click', () => {
+            sound.enabled = !sound.enabled;
+            soundIcon.textContent = sound.enabled ? '🔊' : '🔇';
+            if (sound.enabled) sound.playPop();
+        });
+
+        startBtn.addEventListener('click', startGame);
+
+        // Инициализация поля при загрузке страницы
+        window.addEventListener('DOMContentLoaded', () => {
+            createHoles();
+        });
+    </script>
+</body>
+</html>
